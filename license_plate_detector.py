@@ -48,11 +48,12 @@ def is_license_plate(contur):
 
 
 def main():
-    image = cv2.imread('7.jpg')
+    image = cv2.imread('6.jpg')
     thresholded_car_image = get_threshold(image)
 
     conturs,_ = cv2.findContours(thresholded_car_image,cv2.RETR_EXTERNAL,cv2.RETR_CCOMP)
     
+    #image = cv2.drawContours(image,conturs,-1,(0,255,0),3)
     
     
     license_plates = [is_license_plate(cont) for cont in conturs if is_license_plate(cont) != None]
