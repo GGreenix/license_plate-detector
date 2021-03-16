@@ -26,26 +26,41 @@ def is_good_ratio(box):# needs to work on rectangle orientation
     segment_1 = int(math.dist(box[0],box[3])) # width
     segment_2 = int(cv2.contourArea(box)/segment_1) # height
     
-    
+    if segment_1 < segment_2:
+        segment_1,segment_2 = segment_2,segment_1
         
     retio_between_width_and_height = segment_1/segment_2
     
-    return retio_between_width_and_height < 5.5 and retio_between_width_and_height > 2.5
     
+    return retio_between_width_and_height < 6 and retio_between_width_and_height > 1.5
      
     
 
 
-def is_license_plate(contur):
+def First_license_plate_filter(contur):
     bounding_minimum_area_rectangle = cv2.minAreaRect(contur)
     box = cv2.boxPoints(bounding_minimum_area_rectangle)
     box = np.int0(box)
     x,y,w,h = cv2.boundingRect(contur)
     
-    if cv2.contourArea(box) > 1000 and is_good_ratio(box) and (w*h)/cv2.contourArea(contur) < 1.7:
-        return (x,y,w,h)
+    return cv2.contourArea(box) > 1000 and is_good_ratio(box) and (w*h)/cv2.contourArea(contur) < 1.7 and w > h
+        
+    
+def get_minimum_bounding_box(contur):
+    bounding_minimum_area_rectangle = cv2.minAreaRect(contur)
+    box = cv2.boxPoints(bounding_minimum_area_rectangle)
+    box = np.int0(box)
+    x,y,w,h = cv2.boundingRect(contur)
+    return x,y,w,h
 
+def extract_license_from_image(car_image,thresh_image,parameters):  
+    x,y,w,h = parameters
+    mask = thresh_image[y:y+h,x:x+w]
+    license_plate = car_image[y:y+h,x:x+w]
+    license_plate = cv2.bitwise_and(license_plate,license_plate,mask=mask)
+    return license_plate
 
+#def check_for_average_black_in_license_plate  
 
 def main():
     image = cv2.imread('6.jpg')
@@ -53,16 +68,18 @@ def main():
 
     conturs,_ = cv2.findContours(thresholded_car_image,cv2.RETR_EXTERNAL,cv2.RETR_CCOMP)
     
-    #image = cv2.drawContours(image,conturs,-1,(0,255,0),3)
     
     
-    license_plates = [is_license_plate(cont) for cont in conturs if is_license_plate(cont) != None]
+    license_plates = [get_minimum_bounding_box(contur) for contur in conturs if First_license_plate_filter(contur)]
     
-    for (x,y,w,h),num in zip(license_plates,range(len(license_plates))):
+    
+    
+    for params,num in zip(license_plates,range(len(license_plates))):
         
-        if w > h: #checking the orientation of the rectangle
-            
-            image[y:y+h,x:x+w] = [0,0,0]
+        x,y,w,h = params
+        
+        cv2.imshow(str(num),extract_license_from_image(image,thresholded_car_image,params))
+        image[y:y+h,x:x+w] = [0,0,0]
        
        
 
