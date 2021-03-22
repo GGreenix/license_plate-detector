@@ -5,24 +5,42 @@ import math
 
 
 def get_threshold(car_image):
-    kernel = np.ones((5,5),'uint8')
+
+    '''
+    input (original image)
+
+    this fucntion is thresholding, blurring and generally proccesing the image for later use in the procces
+
+    return (thresholded original image)
+    '''
+    kernel = np.ones((5,5),'uint8') #a 5x5 kernel for morphing the image and proccecing noise
 
     low_yellow = (10,80,108)
     high_yellow = (22,210,168)
 
     hsv_img = cv2.cvtColor(car_image,cv2.COLOR_BGR2HSV)
 
-    threshsv = cv2.inRange(hsv_img,low_yellow,high_yellow)
-    threshsv = cv2.blur(threshsv,(5,5))
+    thresholded_image = cv2.inRange(hsv_img,low_yellow,high_yellow)
+    thresholded_image = cv2.blur(thresholded_image,(5,5))
 
 
-    threshsv = cv2.morphologyEx(threshsv,cv2.MORPH_CLOSE,kernel,iterations=1)
-    threshsv = cv2.blur(threshsv,(5,5))
+    thresholded_image = cv2.morphologyEx(thresholded_image,cv2.MORPH_CLOSE,kernel,iterations=1)
+    thresholded_image = cv2.blur(thresholded_image,(5,5))
 
-    return threshsv
+    return thresholded_image
 
 
-def is_good_ratio(box):# needs to work on rectangle orientation
+def is_good_ratio(box):
+    '''
+    input(minimum bounding rectagnle of given contur)
+
+    this function is returning wether the given minimum ractangle of a given contur
+    is between the ratio of the constant ratio of a license plate
+
+    return( if given bounding rectangle ratio matches constant ratio of a license plate)
+
+    '''
+
     segment_1 = int(math.dist(box[0],box[3])) # width
     segment_2 = int(cv2.contourArea(box)/segment_1) # height
     
@@ -31,23 +49,49 @@ def is_good_ratio(box):# needs to work on rectangle orientation
         
     retio_between_width_and_height = segment_1/segment_2
     
+    return inRange((2,6),retio_between_width_and_height)
     
-    return retio_between_width_and_height < 6 and retio_between_width_and_height > 2
      
     
 
 
-def First_license_plate_filter(contur):
+def First_license_plate_filter(contur):# fix for it to be area and MINIMUM bounding rect area and not bigger bounding rect
+
+    '''
+    input (found contur coordinates numpy array)
+    
+    this function is taking the minimum bounding rectangle of a given
+    contur and checks four different facotrs:
+    - it's area is greater then 900 pixels
+    - given minimum rectangle of given contur returns True from function is_good_area
+    - if the ratio of the minimum bounding rectangle and the area is less then 1.7
+    - width bigger then height
+
+    return (if the given contur is all true in the given if statments below)
+    '''
     bounding_minimum_area_rectangle = cv2.minAreaRect(contur)
     box = cv2.boxPoints(bounding_minimum_area_rectangle)
     box = np.int0(box)
+    width_of_minimus_bounding_rect = math.dist((box[0][0],box[0][1]),(box[3][0],box[3][1]))
+    height_of_minimus_bounding_rect = math.dist((box[0][0],box[0][1]),(box[1][0],box[1][1]))
     x,y,w,h = cv2.boundingRect(contur)
     
-    return cv2.contourArea(box) > 900 and is_good_ratio(box) and (w*h)/cv2.contourArea(contur) < 1.7 and w > h
+    return cv2.contourArea(box) > 900 and is_good_ratio(box) and (width_of_minimus_bounding_rect*height_of_minimus_bounding_rect)/cv2.contourArea(contur) < 1.7 and w > h
     
         
     
 def get_minimum_bounding_box(contur):
+    '''
+    input (filtered contur (might be a license plate))
+
+    this function is taking the given contur that
+    might be a license plate after first filtering and 
+    returning the bounding box of the minimum rectangle
+    of the given contur
+
+    return (bounding box of given contur)
+
+    '''
     bounding_minimum_area_rectangle = cv2.minAreaRect(contur)
     box = cv2.boxPoints(bounding_minimum_area_rectangle)
     box = np.int0(box)
@@ -55,7 +99,20 @@ def get_minimum_bounding_box(contur):
     return x,y,w,h
     
 
-def extract_license_from_image(license_plate_image,thresh_image,parameters):  
+def extract_license_from_image(license_plate_image,thresh_image,parameters):
+
+    '''
+    input (full image which contains the license plate, thresholded cars image, paramters of given license plate)
+
+    this function is slicing a mask with the coordinates of the given license plate paramters
+    from the thresholded image, and from the original image to much the sizes.
+    then it is uses an and gate with the thresholded sliced mask as a mask and the original image
+    to get the original license plate image.
+
+    return (image with the size of the bounding rectangle which contains the license plate on x,y,w,h parameters)
+
+    '''
+
     x,y,w,h = parameters
     mask = thresh_image[y:y+h,x:x+w]
     license_plate = license_plate_image[y:y+h,x:x+w]
@@ -64,6 +121,15 @@ def extract_license_from_image(license_plate_image,thresh_image,parameters):
 
 
 def inRange(range,value_to_compare):
+
+    '''
+    input(range(tuple), a numerical value)
+
+    this function is checking if a given value is between a given range
+
+    return(if the given value is between the given two values)
+    '''
+
     return range[0] < value_to_compare and value_to_compare < range[1]
 
 
@@ -74,7 +140,7 @@ def is_pixel_black_enough(pixel):
     this function is used for checking if given pixel HSV
     values are between constant range
 
-    output (if H_value,S_value,V_value are between the constant range of (0,0,20)-(50,255,140))
+    return (if H_value,S_value,V_value are between the constant range of (0,0,20)-(50,255,140))
     '''
     lower_black = (0,0,20)
     higher_black = (50,255,140)
@@ -101,10 +167,11 @@ def check_for_black_pixels_in_roi(image_roi,thresh_roi):
     sum_of_black_pixels = 0 
     
     image_hsv_roi = cv2.cvtColor(image_roi,cv2.COLOR_BGR2HSV)
-    new_shape = image_roi.shape[0]*image_roi.shape[1]
-    thresh_roi = cv2.threshold(thresh_roi,1,255,cv2.THRESH_BINARY)[1]
-    sum_of_thresholded_pixels = (thresh_roi == 255).sum()
+    new_shape = image_roi.shape[0]*image_roi.shape[1]                       #calculates new shape for reshaping the image for a better analasys
+    thresh_roi = cv2.threshold(thresh_roi,1,255,cv2.THRESH_BINARY)[1]       #given thresholded image are being thresholded again because of blur and morphology 
+    sum_of_thresholded_pixels = (thresh_roi == 255).sum()                   #summerize amount of white pixels in thresholded image
     flattened_hsv_img_roi,flattened_thresh_roi = image_hsv_roi.reshape(new_shape,3),thresh_roi.flatten()
+
     for i in flattened_hsv_img_roi:        
         if is_pixel_black_enough(i):
             sum_of_black_pixels += 1
